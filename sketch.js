@@ -56,52 +56,60 @@ async function assignRole() {
     
     if (!data || !data.p1Joined) {
         myRole = "P1";
-        gameRef.update({ p1Joined: true, status: "WAITING_FOR_P2" });
+        // P1が入る時は、前の試合のゴミが残らないよう set で初期化
+        await gameRef.set({ 
+            p1Joined: true, 
+            p2Joined: false, 
+            status: "WAITING_FOR_P2" 
+        });
     } else if (!data.p2Joined) {
         myRole = "P2";
-        gameRef.update({ p2Joined: true });
+        // P2が参加したのと同時にゲームを開始させる
+        // 2つの update を分けるとバグるので、resetOnlineGameの中でまとめて送る
         resetOnlineGame();
     } else {
         gameState = "FULL";
     }
 }
 
-function resetOnlineGame() {
+async function resetOnlineGame() {
     const newTarget = floor(random(10, 91));
     const h1 = Array.from({length: 5}, () => floor(random(1, 10)));
     const h2 = Array.from({length: 5}, () => floor(random(1, 10)));
     
-    gameRef.update({
-        target: newTarget, p1Hand: h1, p2Hand: h2,
-        p1Result: null, p1Time: null, p2Result: null, p2Time: null,
-        status: "PLAYING"
+    // updateの内容を一つにまとめる
+    // こうすることで「P2参加」と「ゲーム開始」が同時にFirebaseに書き込まれます
+    await gameRef.update({
+        p2Joined: true, // P2の参加もここで一緒に報告
+        target: newTarget, 
+        p1Hand: h1, 
+        p2Hand: h2,
+        p1Result: "none", // 数値以外の文字列を入れることで「未完了」を明示
+        p1Time: "none",
+        p2Result: "none",
+        p2Time: "none",
+        status: "PLAYING" // これで P1 が進めるようになる
     });
 }
-
 function syncGame() {
     if (!onlineData) return;
 
     if (onlineData.status === "PLAYING") {
         targetNumber = onlineData.target;
         
-        // 1. 手札のセット（まだ持っていない場合のみ）
         if (currentHand.length === 0 && !hasFinished(myRole)) {
             currentHand = myRole === "P1" ? [...onlineData.p1Hand] : [...onlineData.p2Hand];
             startTime = millis();
         }
 
-        // 2. 状態の判定（優先順位が重要！）
         let p1Done = typeof onlineData.p1Result === 'number';
         let p2Done = typeof onlineData.p2Result === 'number';
 
         if (p1Done && p2Done) {
-            // 両方終わっていたら何よりも優先してリザルト画面
             gameState = "RESULT";
         } else if (hasFinished(myRole)) {
-            // 自分だけ終わっていたら待機画面
             gameState = "FINISH_WAIT";
         } else {
-            // まだプレイ中ならプレイ画面
             gameState = "PLAYING";
         }
     } else if (onlineData.status === "WAITING_FOR_P2") {
