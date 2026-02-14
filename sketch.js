@@ -80,16 +80,25 @@ function resetOnlineGame() {
 
 function syncGame() {
     if (!onlineData) return;
+
     if (onlineData.status === "PLAYING") {
         gameState = "PLAYING";
         targetNumber = onlineData.target;
-        if (currentHand.length === 0) {
+        
+        // 手札のセット（まだ持っていない場合のみ）
+        if (currentHand.length === 0 && !hasFinished(myRole)) {
             currentHand = myRole === "P1" ? [...onlineData.p1Hand] : [...onlineData.p2Hand];
             startTime = millis();
         }
-        if (onlineData.p1Result !== null && onlineData.p1Result !== undefined &&
-            onlineData.p2Result !== null && onlineData.p2Result !== undefined) {
+
+        // 両者の結果が「数値」として存在するかチェック
+        let p1Done = typeof onlineData.p1Result === 'number';
+        let p2Done = typeof onlineData.p2Result === 'number';
+
+        if (p1Done && p2Done) {
             gameState = "RESULT";
+        } else if (hasFinished(myRole)) {
+            gameState = "FINISH_WAIT";
         }
     } else if (onlineData.status === "WAITING_FOR_P2") {
         gameState = "WAITING";
@@ -193,6 +202,11 @@ function mousePressed() {
     }
 }
 
+function hasFinished(role) {
+    if (!onlineData) return false;
+    return role === "P1" ? typeof onlineData.p1Result === 'number' : typeof onlineData.p2Result === 'number';
+}
+
 function applyOp(idx) {
     let v = currentHand[idx];
     if (selectedOpIdx === 0) currentVal += v;
@@ -204,14 +218,20 @@ function applyOp(idx) {
 
 function finishTurn() {
     let time = (millis() - startTime) / 1000;
+    // 確実に「数値」としてFirebaseに送る
+    let updateData = {};
     if (myRole === "P1") {
-        gameRef.update({ p1Result: currentVal, p1Time: time });
+        updateData.p1Result = Number(currentVal);
+        updateData.p1Time = Number(time);
     } else {
-        gameRef.update({ p2Result: currentVal, p2Time: time });
+        updateData.p2Result = Number(currentVal);
+        updateData.p2Time = Number(time);
     }
+    gameRef.update(updateData);
+    
     currentHand = []; 
+    gameState = "FINISH_WAIT"; // 送信直後に状態を切り替える
 }
-
 function isClick(x, y, w, h) {
     return mouseX > x - w/2 && mouseX < x + w/2 && mouseY > y - h/2 && mouseY < y + h/2;
 }
