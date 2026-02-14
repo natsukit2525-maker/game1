@@ -97,11 +97,13 @@ function syncGame() {
     if (onlineData.status === "PLAYING") {
         targetNumber = onlineData.target;
         
+        // 1. 手札のセット
         if (currentHand.length === 0 && !hasFinished(myRole)) {
             currentHand = myRole === "P1" ? [...onlineData.p1Hand] : [...onlineData.p2Hand];
             startTime = millis();
         }
 
+        // 2. 状態の更新
         let p1Done = typeof onlineData.p1Result === 'number';
         let p2Done = typeof onlineData.p2Result === 'number';
 
@@ -110,13 +112,13 @@ function syncGame() {
         } else if (hasFinished(myRole)) {
             gameState = "FINISH_WAIT";
         } else {
+            // ここで「まだ終わってないならPLAYINGに戻す」処理を入れるとより安全
             gameState = "PLAYING";
         }
     } else if (onlineData.status === "WAITING_FOR_P2") {
         gameState = "WAITING";
     }
 }
-
 function draw() {
     background(25);
     if (gameState === "ENTRY") drawEntryScreen();
@@ -141,9 +143,8 @@ function drawWaitingScreen() {
 }
 
 function drawPlayScreen() {
-    // 自分が完了済みかチェック
-    if ((myRole === "P1" && onlineData.p1Result !== null) || 
-        (myRole === "P2" && onlineData.p2Result !== null)) {
+    // 自分が完了済みかチェック（hasFinished関数を使うように変更）
+    if (hasFinished(myRole)) {
         gameState = "FINISH_WAIT";
         return;
     }
