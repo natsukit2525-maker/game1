@@ -82,23 +82,27 @@ function syncGame() {
     if (!onlineData) return;
 
     if (onlineData.status === "PLAYING") {
-        gameState = "PLAYING";
         targetNumber = onlineData.target;
         
-        // 手札のセット（まだ持っていない場合のみ）
+        // 1. 手札のセット（まだ持っていない場合のみ）
         if (currentHand.length === 0 && !hasFinished(myRole)) {
             currentHand = myRole === "P1" ? [...onlineData.p1Hand] : [...onlineData.p2Hand];
             startTime = millis();
         }
 
-        // 両者の結果が「数値」として存在するかチェック
+        // 2. 状態の判定（優先順位が重要！）
         let p1Done = typeof onlineData.p1Result === 'number';
         let p2Done = typeof onlineData.p2Result === 'number';
 
         if (p1Done && p2Done) {
+            // 両方終わっていたら何よりも優先してリザルト画面
             gameState = "RESULT";
         } else if (hasFinished(myRole)) {
+            // 自分だけ終わっていたら待機画面
             gameState = "FINISH_WAIT";
+        } else {
+            // まだプレイ中ならプレイ画面
+            gameState = "PLAYING";
         }
     } else if (onlineData.status === "WAITING_FOR_P2") {
         gameState = "WAITING";
